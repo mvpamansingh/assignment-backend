@@ -170,3 +170,18 @@ app.post("/signup", async (req, res) => {
       res.status(500).json({ error: "Internal server error" });
     }
   });
+
+  const { Storage } = require('@google-cloud/storage');
+  
+const projectId = "maa-oauth";
+const keyFilename = "maa-oauth-22b2807272c4.json";
+
+const storage = new Storage({
+    projectId,
+    keyFilename
+});
+
+storage.getBuckets().then(results => {
+   // const buckets = results[0];
+    console.log(results);
+})

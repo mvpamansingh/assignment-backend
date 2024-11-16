@@ -237,6 +237,162 @@ const upload = multer({
 });
 
 
+app.post("/createProduct", upload.array('carImages', 10), async (req, res) => {
+  try {
+    const { createdBy, title, description, tags, company, carType, dealer } = req.body;
+    const files = req.files;
+    
+    console.log('Request body:', req.body); 
+    console.log('Files:', files);
+  
+    if (!createdBy || !title || !description || !company) {
+      return res.status(400).json({ error: "Required fields missing" });
+    }
+
+   
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: "At least one image is required" });
+    }
+    if (files.length > 10) {
+      return res.status(400).json({ error: "Maximum 10 images allowed" });
+    }
+
+    
+    const carImages = await Promise.all(files.map(async (file) => {
+      const fileName = `${Date.now()}-${file.originalname}`;
+      const blob = carBucket.file(fileName);
+      
+     
+      const blobStream = blob.createWriteStream({
+        metadata: {
+          contentType: file.mimetype,
+        },
+        resumable: false
+      });
+
+      
+      await new Promise((resolve, reject) => {
+        blobStream.on('error', (error) => reject(error));
+        blobStream.on('finish', () => resolve());
+        blobStream.end(file.buffer);
+      });
+
+      
+      const publicUrl = `https://storage.googleapis.com/${carBucket.name}/${fileName}`;
+      console.log(publicUrl)
+      return {
+        url: publicUrl,
+        publicId: fileName
+      };
+    }));
+
+    
+    const newProduct = new Product({
+      title,
+      description,
+      tags: tags ? JSON.parse(tags) : [],
+      company,
+      carType,
+      dealer,
+      carImages,
+      createdBy: createdBy
+    });
+
+    await newProduct.save();
+
+    
+    const userCar = await UserCar.findOne({ userId :createdBy });
+    if (!userCar) {
+      return res.status(404).json({ error: "User car list not found" });
+    }
+
+    userCar.userCarList.push(newProduct._id);
+    await userCar.save();
+
+    res.status(201).json({
+      message: "Product created successfully",
+      product: newProduct
+    });
+
+  } catch (error) {
+    console.error("Create product error:", error);
+    res.status(500).json({ error: "Internal server error", details:error.message });
+  }
+});
 
 
-
+app.put("/updateProductById", upload.array('carImages', 10), async (req, res) => {
+    try {
+      const { productId, title, description, tags, carType, dealer } = req.body;
+      const files = req.files;
+  
+     
+      if (!productId) {
+        return res.status(400).json({ error: "ProductId is required" });
+      }
+  
+      
+      const existingProduct = await Product.findById(productId);
+      if (!existingProduct) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+  
+      
+      let carImages = existingProduct.carImages; 
+      if (files && files.length > 0) {
+        
+        const newCarImages = await Promise.all(files.map(async (file) => {
+          const fileName = `${Date.now()}-${file.originalname}`;
+          const blob = carBucket.file(fileName);
+          
+          const blobStream = blob.createWriteStream({
+            metadata: {
+              contentType: file.mimetype,
+            },
+            resumable: false
+          });
+  
+          await new Promise((resolve, reject) => {
+            blobStream.on('error', (error) => reject(error));
+            blobStream.on('finish', () => resolve());
+            blobStream.end(file.buffer);
+          });
+  
+          const publicUrl = `https://storage.googleapis.com/${carBucket.name}/${fileName}`;
+          return {
+            url: publicUrl,
+            publicId: fileName
+          };
+        }));
+  
+  
+        carImages = newCarImages;
+      }
+  
+      
+      const updatedProduct = await Product.findByIdAndUpdate(
+        productId,
+        {
+          title: title || existingProduct.title,
+          description: description || existingProduct.description,
+          tags: tags ? JSON.parse(tags) : existingProduct.tags,
+          carType: carType || existingProduct.carType,
+          dealer: dealer || existingProduct.dealer,
+          carImages: carImages
+        },
+        { new: true } 
+      );
+  
+      res.json({
+        message: "Product updated successfully",
+        product: updatedProduct
+      });
+  
+    } catch (error) {
+      console.error("Update product error:", error);
+      res.status(500).json({ 
+        error: "Internal server error", 
+        details: error.message 
+      });
+    }
+  });

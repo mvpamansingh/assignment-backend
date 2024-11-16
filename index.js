@@ -49,30 +49,38 @@ app.get("/", (req, res) => {
 
 // Routes
 
-app.get("/getAllProducts", async (req, res) => {
+app.post("/getAllProducts", async (req, res) => {
+    try {
+        const {userId} = req.body;
+        if(!userId) return res.status(400).json({error: "userId is required"});
 
-    const {userId} = req.body;
-    if(!userId) return res.status(400).json({error: "userId is required"});
+        const userCar = await UserCar.findOne({userId: userId});
+        if (!userCar) {
+            return res.status(404).json({ error: "User not found" });
+        }
 
-    const reqUser = await UserCar.findOne({userId: userId});
+        const products = await Product.find({
+            '_id': { $in: userCar.userCarList }
+        });
 
-    const products = await Product.find({
-        '_id': { $in: userCar.userCarList }
-    });
-
-    res.json(products);
+        res.json(products);
+    } catch (error) {
+        console.error("Get all products error:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
 });
 
 
-app.get("/getProductById", async (req, res) => {
+app.post("/getProductById", async (req, res) => {
     try {
-        const { productId, userId } = req.body;
+        
+      const { productId, userId } = req.body;
         if (!productId || !userId) {
             return res.status(400).json({ error: "productId and userId are required" });
         }
 
         
-        const userCar = await UserCar.findOne({ userId });
+        const userCar = await UserCar.findOne({userId: userId });
         if (!userCar) {
             return res.status(404).json({ error: "User not found" });
         }
@@ -218,23 +226,38 @@ app.post("/signup", async (req, res) => {
 
 
 
+// const upload = multer({
+//   storage: multer.memoryStorage(),
+//   limits: {
+//     fileSize: 6 * 1024 * 1024, 
+//   },
+//   fileFilter: (req, file, cb) => {
+//     const allowedTypes = /jpeg|jpg|png/;
+//     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+//     const mimetype = allowedTypes.test(file.mimetype);
+
+//     if (extname && mimetype) {
+//       return cb(null, true);
+//     } else {
+//       cb('Error: Images only (jpeg, jpg, png)!');
+//     }
+//   }
+// });
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 6 * 1024 * 1024, 
-  },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (extname && mimetype) {
-      return cb(null, true);
+    // Check file type
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true)
     } else {
-      cb('Error: Images only (jpeg, jpg, png)!');
+      cb(new Error('Only image files are allowed!'), false)
     }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
   }
-});
+})
 
 
 app.post("/createProduct", upload.array('carImages', 10), async (req, res) => {
@@ -249,6 +272,15 @@ app.post("/createProduct", upload.array('carImages', 10), async (req, res) => {
       return res.status(400).json({ error: "Required fields missing" });
     }
 
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: "At least one image is required" });
+    }
+
+    
+    const invalidFile = req.files.find(file => !file.mimetype.startsWith('image/'));
+    if (invalidFile) {
+      return res.status(400).json({ error: "Only image files are allowed" });
+    }
    
     if (!files || files.length === 0) {
       return res.status(400).json({ error: "At least one image is required" });

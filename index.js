@@ -322,3 +322,79 @@ app.post("/createProduct", upload.array('carImages', 10), async (req, res) => {
 
 
 
+app.put("/updateProductById", upload.array('carImages', 10), async (req, res) => {
+  try {
+    const { productId, title, description, tags, carType, dealer } = req.body;
+    const files = req.files;
+
+   
+    if (!productId) {
+      return res.status(400).json({ error: "ProductId is required" });
+    }
+
+    
+    const existingProduct = await Product.findById(productId);
+    if (!existingProduct) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    
+    let carImages = existingProduct.carImages; 
+    if (files && files.length > 0) {
+      
+      const newCarImages = await Promise.all(files.map(async (file) => {
+        const fileName = `${Date.now()}-${file.originalname}`;
+        const blob = carBucket.file(fileName);
+        
+        const blobStream = blob.createWriteStream({
+          metadata: {
+            contentType: file.mimetype,
+          },
+          resumable: false
+        });
+
+        await new Promise((resolve, reject) => {
+          blobStream.on('error', (error) => reject(error));
+          blobStream.on('finish', () => resolve());
+          blobStream.end(file.buffer);
+        });
+
+        const publicUrl = `https://storage.googleapis.com/${carBucket.name}/${fileName}`;
+        return {
+          url: publicUrl,
+          publicId: fileName
+        };
+      }));
+
+
+      carImages = newCarImages;
+    }
+
+    
+    const updatedProduct = await Product.findByIdAndUpdate(
+      productId,
+      {
+        title: title || existingProduct.title,
+        description: description || existingProduct.description,
+        tags: tags ? JSON.parse(tags) : existingProduct.tags,
+        carType: carType || existingProduct.carType,
+        dealer: dealer || existingProduct.dealer,
+        carImages: carImages
+      },
+      { new: true } 
+    );
+
+    res.json({
+      message: "Product updated successfully",
+      product: updatedProduct
+    });
+
+  } catch (error) {
+    console.error("Update product error:", error);
+    res.status(500).json({ 
+      error: "Internal server error", 
+      details: error.message 
+    });
+  }
+});
+

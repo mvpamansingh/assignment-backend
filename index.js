@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 
-const mongoUri = 'mongodb+srv://amans:BlackDog@123@cluster0.rapuo.mongodb.net/splynedb';
+const mongoUri = 'mongodb+srv://aman:BlackDog123@cluster0.rapuo.mongodb.net/splynedb?retryWrites=true&w=majority';
 
 const projectId = "maa-oauth";
 const keyFilename = "maa-oauth-22b2807272c4.json";

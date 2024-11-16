@@ -36,7 +36,9 @@ const UserCar = require('./models/UsersCars');
 const Product = require('./models/Products');
 
 mongoose
-  .connect(mongoUri, {useNewUrlParser:true, useUnifiedTopology:true})
+  .connect(mongoUri, {useNewUrlParser:true, useUnifiedTopology:true,
+    serverSelectionTimeoutMS: 9000,
+    socketTimeoutMS: 45000,})
   .then(() => console.log("Connected to MongoDB"))
   .catch((err) => console.error("MongoDB connection error:", err));
 

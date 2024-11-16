@@ -104,7 +104,7 @@ app.post("/getProductById", async (req, res) => {
 });
 
 
-app.delete("/deleteProductById", async (req, res) => {
+app.post("/deleteProductById", async (req, res) => {
     try {
       const { productId, userId } = req.body;
       
@@ -354,7 +354,7 @@ app.post("/createProduct", upload.array('carImages', 10), async (req, res) => {
 
 
 
-app.put("/updateProductById", upload.array('carImages', 10), async (req, res) => {
+app.post("/updateProductById", upload.array('carImages', 10), async (req, res) => {
   try {
     const { productId, title, description, tags, carType, dealer } = req.body;
     const files = req.files;
